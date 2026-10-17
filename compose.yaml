@@ -1,0 +1,73 @@
+# Celestial Classifier — multi-container application
+# Start everything with:  docker compose up --build
+# All credentials come from the git-ignored `.env` file (see `.env.example`).
+
+name: celestial-classifier
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — stores categories and every classification (incl. the image)
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: celestial-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+    volumes:
+      # Named volume -> data survives `docker compose down` / container re-creation
+      - pgdata:/var/lib/postgresql/data
+      # Schema + seed data, executed only when the volume is empty (first start)
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - celestial-net
+    # No host port published: the database is reachable only from the internal network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # FastAPI backend — REST API + static web UI, talks to Gemini and PostgreSQL
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: celestial-classifier-backend:latest
+    container_name: celestial-backend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      # Database connection (service name `db` is resolved by Docker's DNS)
+      DB_HOST: db
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Application configuration
+      CLASSIFIER_MODE: ${CLASSIFIER_MODE:-auto}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+    networks:
+      - celestial-net
+
+networks:
+  celestial-net:
+    name: celestial-net
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: celestial_pgdata
