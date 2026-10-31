@@ -5,8 +5,11 @@ Endpoints
 GET    /api/health                       liveness + DB + classifier info
 GET    /api/categories                   READ  categories table
 POST   /api/classify                     WRITE new classification (image -> AI -> DB)
+POST   /api/classifications              WRITE new classification (JSON -> DB)
 GET    /api/classifications              READ  paginated, filterable history
 GET    /api/classifications/{id}         READ  single classification
+PUT    /api/classifications/{id}         WRITE replace/update classification
+PATCH  /api/classifications/{id}         WRITE partially update classification
 GET    /api/classifications/{id}/image   READ  stored image bytes
 DELETE /api/classifications/{id}         WRITE delete a classification
 GET    /api/stats                        READ  aggregate statistics
@@ -29,8 +32,10 @@ from .models import Category, Classification
 from .schemas import (
     CategoryOut,
     CategoryStat,
+    ClassificationCreate,
     ClassificationOut,
     ClassificationPage,
+    ClassificationUpdate,
     HealthOut,
     StatsOut,
 )
@@ -171,6 +176,46 @@ def classify(
     return to_out(record)
 
 
+@app.post("/api/classifications", response_model=ClassificationOut, status_code=201, tags=["classifications"])
+def create_classification(
+    payload: ClassificationCreate,
+    db: Session = Depends(get_session),
+) -> ClassificationOut:
+    category = db.get(Category, payload.category)
+    if not category:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Category '{payload.category}' is not valid. Use GET /api/categories to see available categories.",
+        )
+    if not (0.0 <= payload.confidence <= 1.0):
+        raise HTTPException(status_code=400, detail="Confidence must be between 0.0 and 1.0.")
+
+    # 1x1 PNG pixel fallback for manual entry
+    tiny_png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+        b"\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe\r\xef\x0f\n\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    record = Classification(
+        original_name=(payload.original_name or "manual_observation.jpg")[:255],
+        mime_type="image/png",
+        image_size=len(tiny_png),
+        image_data=tiny_png,
+        category=payload.category,
+        confidence=round(payload.confidence, 3),
+        object_name=payload.object_name[:200] if payload.object_name else None,
+        description=payload.description[:2000] if payload.description else None,
+        visual_features=payload.visual_features[:6],
+        fun_fact=payload.fun_fact[:1000] if payload.fun_fact else None,
+        model_used="manual_entry",
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    log.info("Created manual classification #%d: %s", record.id, record.category)
+    return to_out(record)
+
+
 @app.get("/api/classifications", response_model=ClassificationPage, tags=["classifications"])
 def list_classifications(
     category: str | None = Query(default=None, description="Filter by category slug"),
@@ -194,6 +239,47 @@ def list_classifications(
 @app.get("/api/classifications/{classification_id}", response_model=ClassificationOut, tags=["classifications"])
 def get_classification(classification_id: int, db: Session = Depends(get_session)) -> ClassificationOut:
     return to_out(get_or_404(db, classification_id))
+
+
+@app.put("/api/classifications/{classification_id}", response_model=ClassificationOut, tags=["classifications"])
+@app.patch("/api/classifications/{classification_id}", response_model=ClassificationOut, tags=["classifications"])
+def update_classification(
+    classification_id: int,
+    payload: ClassificationUpdate,
+    db: Session = Depends(get_session),
+) -> ClassificationOut:
+    record = get_or_404(db, classification_id)
+
+    if payload.category is not None:
+        category = db.get(Category, payload.category)
+        if not category:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Category '{payload.category}' is not valid. Use GET /api/categories to see available categories.",
+            )
+        record.category = payload.category
+
+    if payload.confidence is not None:
+        if not (0.0 <= payload.confidence <= 1.0):
+            raise HTTPException(status_code=400, detail="Confidence must be between 0.0 and 1.0.")
+        record.confidence = round(payload.confidence, 3)
+
+    if payload.object_name is not None:
+        record.object_name = payload.object_name[:200] if payload.object_name.strip() else None
+
+    if payload.description is not None:
+        record.description = payload.description[:2000] if payload.description.strip() else None
+
+    if payload.fun_fact is not None:
+        record.fun_fact = payload.fun_fact[:1000] if payload.fun_fact.strip() else None
+
+    if payload.visual_features is not None:
+        record.visual_features = [f[:120] for f in payload.visual_features if f.strip()][:6]
+
+    db.commit()
+    db.refresh(record)
+    log.info("Updated classification #%d: category=%s, name=%s", record.id, record.category, record.object_name)
+    return to_out(record)
 
 
 @app.get("/api/classifications/{classification_id}/image", tags=["classifications"])

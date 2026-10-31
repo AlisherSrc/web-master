@@ -30,6 +30,25 @@ class ClassificationOut(BaseModel):
     created_at: datetime
 
 
+class ClassificationCreate(BaseModel):
+    category: str
+    object_name: str | None = None
+    description: str | None = None
+    fun_fact: str | None = None
+    confidence: float = 1.0
+    visual_features: list[str] = []
+    original_name: str = "manual_observation.jpg"
+
+
+class ClassificationUpdate(BaseModel):
+    category: str | None = None
+    object_name: str | None = None
+    description: str | None = None
+    fun_fact: str | None = None
+    confidence: float | None = None
+    visual_features: list[str] | None = None
+
+
 class ClassificationPage(BaseModel):
     items: list[ClassificationOut]
     total: int

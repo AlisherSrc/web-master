@@ -1,0 +1,609 @@
+{
+  "info": {
+    "_postman_id": "c3e859b2-1144-47ef-a0d3-5e929f4b7a11",
+    "name": "Celestial Classifier API",
+    "description": "Comprehensive Postman test collection for the Celestial Classifier project.\nCovers full REST CRUD (Create, Read, Update, Delete) along with health checks and aggregate statistics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "classification_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. System Health",
+      "item": [
+        {
+          "name": "Get System Health & DB Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Checks backend health, PostgreSQL connectivity, classifier mode, and active model."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"System status is ok and database is up\", function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.status).to.eql(\"ok\");",
+                  "    pm.expect(data.database).to.eql(\"up\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Categories",
+      "item": [
+        {
+          "name": "List All Allowed Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "description": "Retrieves the master list of 14 astronomical and non-celestial categories stored in PostgreSQL."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Returns array of categories\", function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data).to.be.an(\"array\");",
+                  "    pm.expect(data.length).to.be.at.least(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Classifications (CRUD)",
+      "item": [
+        {
+          "name": "Create via Image Upload (POST /api/classify)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "sample_images/galaxy.jpg",
+                  "description": "Upload a JPEG, PNG, or WebP space image (e.g. from sample_images/galaxy.jpg)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/classify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classify"
+              ]
+            },
+            "description": "Uploads an image, classifies it with Gemini (or deterministic offline mock), and saves record + image binary in PostgreSQL."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"Returns valid classification object\", function () {",
+                  "    pm.expect(data).to.have.property(\"id\");",
+                  "    pm.expect(data).to.have.property(\"category\");",
+                  "    pm.expect(data).to.have.property(\"confidence\");",
+                  "});",
+                  "if (data.id) {",
+                  "    pm.collectionVariables.set(\"classification_id\", String(data.id));",
+                  "    console.log(\"Saved classification_id: \" + data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create via JSON Data (POST /api/classifications)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"nebula\",\n  \"object_name\": \"Carina Nebula (NGC 3372)\",\n  \"description\": \"A complex area of bright and dark nebulosity in the constellation Carina, approximately 8,500 light-years away.\",\n  \"fun_fact\": \"Home to Eta Carinae, one of the most massive and unstable stellar systems known in the Milky Way.\",\n  \"confidence\": 0.985,\n  \"visual_features\": [\n    \"diffuse emission\",\n    \"dark dust pillars\",\n    \"luminous blue star\"\n  ],\n  \"original_name\": \"carina_observation.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ]
+            },
+            "description": "Standard REST JSON resource creation endpoint. Stores an observation directly in PostgreSQL."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"Classification ID and fields created correctly\", function () {",
+                  "    pm.expect(data).to.have.property(\"id\");",
+                  "    pm.expect(data.category).to.eql(\"nebula\");",
+                  "    pm.expect(data.object_name).to.include(\"Carina\");",
+                  "});",
+                  "if (data.id) {",
+                  "    pm.collectionVariables.set(\"classification_id\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List All Classifications (GET /api/classifications)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications?limit=12&offset=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "12"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Returns paginated classification history ordered by newest first."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"Contains pagination metadata and items array\", function () {",
+                  "    pm.expect(data).to.have.property(\"items\");",
+                  "    pm.expect(data).to.have.property(\"total\");",
+                  "    pm.expect(data.items).to.be.an(\"array\");",
+                  "});",
+                  "if (data.items.length > 0 && !pm.collectionVariables.get(\"classification_id\")) {",
+                  "    pm.collectionVariables.set(\"classification_id\", String(data.items[0].id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter Classifications by Category",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications?category=galaxy&limit=10&offset=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "galaxy"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Returns classifications filtered by category slug."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"Items belong to requested category\", function () {",
+                  "    data.items.forEach(function(item) {",
+                  "        pm.expect(item.category).to.eql(\"galaxy\");",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Classification by ID (GET /api/classifications/{id})",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications/{{classification_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{classification_id}}"
+              ]
+            },
+            "description": "Fetches a single classification record by its primary key ID."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"Returns the requested record\", function () {",
+                  "    pm.expect(String(data.id)).to.eql(pm.collectionVariables.get(\"classification_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Classification Image (GET /api/classifications/{id}/image)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications/{{classification_id}}/image",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{classification_id}}",
+                "image"
+              ]
+            },
+            "description": "Streams the raw image binary bytes stored in PostgreSQL."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Returns image content-type header\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Classification via PATCH (Partial Update)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object_name\": \"Verified Astronomical Discovery\",\n  \"description\": \"Updated observation report: high spectral resolution confirms ionized gas structures.\",\n  \"fun_fact\": \"Spectroscopy confirms radial velocity blueshift.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications/{{classification_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{classification_id}}"
+              ]
+            },
+            "description": "Partially updates object name, description, category, or fun fact of an observation."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"Updated fields reflected in response\", function () {",
+                  "    pm.expect(data.object_name).to.eql(\"Verified Astronomical Discovery\");",
+                  "    pm.expect(data.description).to.include(\"Updated observation report\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Classification via PUT (Full Replace/Update)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"galaxy\",\n  \"object_name\": \"Andromeda Galaxy (M31 / NGC 224)\",\n  \"description\": \"Barred spiral galaxy approximately 2.5 million light-years from Earth.\",\n  \"confidence\": 0.99,\n  \"fun_fact\": \"Andromeda contains roughly one trillion stars, more than double the Milky Way.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications/{{classification_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{classification_id}}"
+              ]
+            },
+            "description": "Replaces classification attributes and revalidates category against database lookup table."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"PUT update reflected in response\", function () {",
+                  "    pm.expect(data.category).to.eql(\"galaxy\");",
+                  "    pm.expect(data.confidence).to.eql(0.99);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Classification (DELETE /api/classifications/{id})",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/classifications/{{classification_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{classification_id}}"
+              ]
+            },
+            "description": "Permanently deletes a classification record and its image bytes from PostgreSQL."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204 No Content\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Analytics & Statistics",
+      "item": [
+        {
+          "name": "Get Observatory Statistics (GET /api/stats)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "stats"
+              ]
+            },
+            "description": "Computes real-time aggregate statistics from PostgreSQL: total scans, celestial count, imposter count, average confidence, and per-category distributions."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.test(\"Stats contain expected counters\", function () {",
+                  "    pm.expect(data).to.have.property(\"total\");",
+                  "    pm.expect(data).to.have.property(\"celestial\");",
+                  "    pm.expect(data).to.have.property(\"not_celestial\");",
+                  "    pm.expect(data).to.have.property(\"by_category\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -186,8 +186,30 @@
         <p class="muted small" id="modal-conf-text"></p>
         <p id="modal-desc"></p>
         <ul class="chips" id="modal-features"></ul>
-        <div class="fun-fact"><span class="fun-fact__icon">💡</span><p id="modal-fact"></p></div>
-        <div class="modal__actions">
+        <div class="fun-fact" id="modal-fact-wrap"><span class="fun-fact__icon">💡</span><p id="modal-fact"></p></div>
+        
+        <form class="modal__edit-form" id="modal-edit-form" hidden onsubmit="return false;">
+          <h4 class="section-label">Edit Observation</h4>
+          <label class="form-label" for="edit-name">Object name</label>
+          <input type="text" id="edit-name" class="form-input" placeholder="e.g. Andromeda Galaxy (M31)" />
+          
+          <label class="form-label" for="edit-category">Category</label>
+          <select id="edit-category" class="form-input"></select>
+          
+          <label class="form-label" for="edit-desc">Description</label>
+          <textarea id="edit-desc" class="form-input" rows="3" placeholder="Observation notes..."></textarea>
+          
+          <label class="form-label" for="edit-fact">Fun fact</label>
+          <textarea id="edit-fact" class="form-input" rows="2" placeholder="Interesting astronomical fact..."></textarea>
+          
+          <div class="modal__edit-actions">
+            <button type="button" class="btn btn--primary" id="edit-save-btn">Save changes</button>
+            <button type="button" class="btn btn--ghost" id="edit-cancel-btn">Cancel</button>
+          </div>
+        </form>
+
+        <div class="modal__actions" id="modal-actions">
+          <button type="button" class="btn btn--ghost" id="modal-edit-btn">Edit observation</button>
           <button type="button" class="btn btn--danger" id="modal-delete">Delete observation</button>
         </div>
       </div>

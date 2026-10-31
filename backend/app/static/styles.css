@@ -437,7 +437,31 @@ kbd {
   transition: transform 0.25s var(--ease), background 0.25s;
 }
 .modal__close:hover { transform: rotate(90deg); background: rgba(167, 139, 250, 0.25); }
-.modal__actions { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+.modal__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem; }
+.modal__edit-form { display: grid; gap: 0.6rem; margin-top: 0.8rem; padding: 1rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.modal__edit-form[hidden] { display: none !important; }
+.form-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: -0.2rem; }
+.form-input {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--violet);
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.25);
+}
+select.form-input option {
+  background: #0d0f22;
+  color: var(--text);
+}
+.modal__edit-actions { display: flex; gap: 0.6rem; margin-top: 0.4rem; justify-content: flex-end; }
 .confidence-bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .confidence-bar span { display: block; height: 100%; width: 0; background: var(--grad); border-radius: inherit; transition: width 1s var(--ease); }
 

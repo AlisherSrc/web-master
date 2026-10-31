@@ -57,6 +57,9 @@
     modalBadge: $("#modal-badge"), modalName: $("#modal-name"), modalMeta: $("#modal-meta"),
     modalConfBar: $("#modal-conf-bar"), modalConfText: $("#modal-conf-text"), modalDesc: $("#modal-desc"),
     modalFeatures: $("#modal-features"), modalFact: $("#modal-fact"), modalDelete: $("#modal-delete"),
+    modalEditBtn: $("#modal-edit-btn"), modalEditForm: $("#modal-edit-form"),
+    editName: $("#edit-name"), editCategory: $("#edit-category"), editDesc: $("#edit-desc"), editFact: $("#edit-fact"),
+    editSaveBtn: $("#edit-save-btn"), editCancelBtn: $("#edit-cancel-btn"), modalActions: $("#modal-actions"),
     toasts: $("#toasts"),
   };
 
@@ -428,22 +431,29 @@
   // ---------------------------------------------------------------------------
   // Detail modal
   // ---------------------------------------------------------------------------
+  function renderModalView(c) {
+    el.modalImg.src = c.image_url;
+    el.modalImg.alt = c.object_name || c.category_label;
+    setBadge(el.modalBadge, c.category, c.category_label);
+    el.modalName.textContent = c.object_name || c.category_label;
+    el.modalMeta.textContent = `${c.original_name} · ${formatBytes(c.image_size)} · ${new Date(c.created_at).toLocaleString()} · ${c.model_used}`;
+    el.modalConfBar.style.width = "0";
+    el.modalConfText.textContent = `${pct(c.confidence)} confidence`;
+    el.modalDesc.textContent = c.description || "";
+    renderChips(el.modalFeatures, c.visual_features);
+    el.modalFact.textContent = c.fun_fact || "";
+    requestAnimationFrame(() => (el.modalConfBar.style.width = pct(c.confidence)));
+  }
+
   async function openModal(id) {
     try {
       const c = await api(`/classifications/${id}`);
       state.modalId = id;
-      el.modalImg.src = c.image_url;
-      el.modalImg.alt = c.object_name || c.category_label;
-      setBadge(el.modalBadge, c.category, c.category_label);
-      el.modalName.textContent = c.object_name || c.category_label;
-      el.modalMeta.textContent = `${c.original_name} · ${formatBytes(c.image_size)} · ${new Date(c.created_at).toLocaleString()} · ${c.model_used}`;
-      el.modalConfBar.style.width = "0";
-      el.modalConfText.textContent = `${pct(c.confidence)} confidence`;
-      el.modalDesc.textContent = c.description || "";
-      renderChips(el.modalFeatures, c.visual_features);
-      el.modalFact.textContent = c.fun_fact || "";
+      state.currentObservation = c;
+      el.modalEditForm.hidden = true;
+      el.modalActions.hidden = false;
+      renderModalView(c);
       el.modal.showModal();
-      requestAnimationFrame(() => (el.modalConfBar.style.width = pct(c.confidence)));
     } catch (err) {
       toast(err.message, "error");
     }
@@ -452,6 +462,52 @@
   function initModal() {
     el.modalClose.addEventListener("click", () => el.modal.close());
     el.modal.addEventListener("click", (e) => { if (e.target === el.modal) el.modal.close(); });
+
+    el.modalEditBtn.addEventListener("click", () => {
+      const c = state.currentObservation;
+      if (!c) return;
+      el.editName.value = c.object_name || "";
+      el.editDesc.value = c.description || "";
+      el.editFact.value = c.fun_fact || "";
+      el.editCategory.innerHTML = state.categories
+        .map((cat) => `<option value="${cat.slug}" ${cat.slug === c.category ? "selected" : ""}>${escapeHtml(cat.label)}</option>`)
+        .join("");
+      el.modalEditForm.hidden = false;
+      el.modalActions.hidden = true;
+    });
+
+    el.editCancelBtn.addEventListener("click", () => {
+      el.modalEditForm.hidden = true;
+      el.modalActions.hidden = false;
+    });
+
+    el.editSaveBtn.addEventListener("click", async () => {
+      if (!state.modalId) return;
+      try {
+        const payload = {
+          object_name: el.editName.value.trim() || null,
+          category: el.editCategory.value,
+          description: el.editDesc.value.trim() || null,
+          fun_fact: el.editFact.value.trim() || null,
+        };
+        const updated = await api(`/classifications/${state.modalId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        state.currentObservation = updated;
+        renderModalView(updated);
+        el.modalEditForm.hidden = true;
+        el.modalActions.hidden = false;
+        toast("Observation updated successfully!", "success");
+        await loadStats();
+        renderFilters();
+        await loadHistory(true);
+      } catch (err) {
+        toast(`Update failed: ${err.message}`, "error");
+      }
+    });
+
     el.modalDelete.addEventListener("click", async () => {
       if (!state.modalId || !confirm("Delete this observation permanently?")) return;
       try {
